@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OG Cruise Planner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="wrap">
+    <header class="top">
+      <h1>OG Cruise Planner</h1>
+      <div class="legend">
+        <span class="dot"></span>
+        <span>Blocked date</span>
+      </div>
+    </header>
+
+    <section class="card controls">
+      <label>
+        Your name
+        <input id="nameInput" type="text" placeholder="Enter your name" maxlength="40" />
+      </label>
+      <p>Click any day to block it. Click your own block to remove it.</p>
+    </section>
+
+    <section id="months" class="months"></section>
+  </main>
+
+  <template id="monthTemplate">
+    <article class="month card">
+      <h2 class="month-title"></h2>
+      <div class="weekdays"></div>
+      <div class="days"></div>
+    </article>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
