@@ -21,9 +21,20 @@ let etag = null;
 const LOCAL_KEY = 'ogCruiseBlocksByDate';
 
 nameInput.value = localStorage.getItem('ogCruiseName') || '';
-nameInput.addEventListener('input', () => {
+nameInput.addEventListener('change', () => {
   localStorage.setItem('ogCruiseName', nameInput.value.trim());
 });
+
+const CLASS_BY_NAME = {
+  connor: 'connor',
+  alexa: 'alexa',
+  taher: 'taher',
+  breidy: 'breidy',
+  sumer: 'sumer',
+  isa: 'isa',
+  renata: 'renata',
+  julissa: 'julissa'
+};
 
 const toDateKey = (date) => {
   const yyyy = date.getFullYear();
@@ -110,7 +121,8 @@ function render() {
 
       blocks.slice(0, 2).forEach((name) => {
         const pill = document.createElement('div');
-        pill.className = 'block';
+        const nameClass = CLASS_BY_NAME[name.toLowerCase()] || '';
+        pill.className = `block ${nameClass}`.trim();
         pill.textContent = name;
         dayEl.appendChild(pill);
       });

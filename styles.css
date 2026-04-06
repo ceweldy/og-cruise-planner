@@ -77,13 +77,24 @@ h1 {
   color: var(--muted);
 }
 
-.controls input {
+.controls input,
+.controls select {
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 10px 12px;
   min-width: 220px;
   font: inherit;
+  background: #fff;
 }
+
+.block.connor { background: #dbeafe; border-color: #2563eb; color: #1e3a8a; }
+.block.alexa { background: #fce7f3; border-color: #db2777; color: #831843; }
+.block.taher { background: #dcfce7; border-color: #16a34a; color: #14532d; }
+.block.breidy { background: #fef3c7; border-color: #d97706; color: #78350f; }
+.block.sumer { background: #ede9fe; border-color: #7c3aed; color: #4c1d95; }
+.block.isa { background: #ffe4e6; border-color: #e11d48; color: #881337; }
+.block.renata { background: #cffafe; border-color: #0891b2; color: #164e63; }
+.block.julissa { background: #ecfccb; border-color: #65a30d; color: #365314; }
 
 .controls p {
   margin: 0;
