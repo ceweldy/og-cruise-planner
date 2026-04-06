@@ -1,10 +1,13 @@
 const YEAR = 2026;
-const BLOB_URL = 'https://jsonblob.com/api/jsonBlob/019d63d7-2d95-7ba7-9525-4845339115ce';
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
+
+const SUPABASE_URL = 'https://ldnzmpqnbbiiwtyunxpo.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxkbnptcHFuYmJpaXd0eXVueHBvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzMzQ0NjcsImV4cCI6MjA4NTkxMDQ2N30.TDZfXz0K7bu8pifms5kKddTy06HI6W0ZOHj_kUj-sPU';
+const API_BASE = `${SUPABASE_URL}/rest/v1/cruise_blocks`;
 
 const monthsEl = document.getElementById('months');
 const monthTemplate = document.getElementById('monthTemplate');
@@ -17,8 +20,6 @@ const PASSCODE = 'theogs';
 const PASSCODE_FLAG = 'ogCruiseUnlocked';
 
 let blocksByDate = {};
-let etag = null;
-const LOCAL_KEY = 'ogCruiseBlocksByDate';
 
 nameInput.value = localStorage.getItem('ogCruiseName') || '';
 nameInput.addEventListener('change', () => {
@@ -36,6 +37,12 @@ const CLASS_BY_NAME = {
   julissa: 'julissa'
 };
 
+const defaultHeaders = {
+  apikey: SUPABASE_ANON_KEY,
+  Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+  'Content-Type': 'application/json'
+};
+
 const toDateKey = (date) => {
   const yyyy = date.getFullYear();
   const mm = String(date.getMonth() + 1).padStart(2, '0');
@@ -43,39 +50,50 @@ const toDateKey = (date) => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
-async function loadData() {
-  try {
-    const res = await fetch(BLOB_URL, { cache: 'no-store' });
-    etag = res.headers.get('etag');
-    const data = await res.json();
-    if (data?.blocksByDate && typeof data.blocksByDate === 'object') {
-      blocksByDate = data.blocksByDate;
-      localStorage.setItem(LOCAL_KEY, JSON.stringify(blocksByDate));
-      return;
-    }
-  } catch {}
-
-  const local = localStorage.getItem(LOCAL_KEY);
-  blocksByDate = local ? JSON.parse(local) : {};
+function rowsToMap(rows) {
+  const out = {};
+  for (const row of rows) {
+    if (!out[row.date_key]) out[row.date_key] = [];
+    out[row.date_key].push(row.person_name);
+  }
+  Object.keys(out).forEach((k) => out[k].sort((a, b) => a.localeCompare(b)));
+  return out;
 }
 
-async function saveData() {
-  localStorage.setItem(LOCAL_KEY, JSON.stringify(blocksByDate));
+async function loadData() {
+  const url = `${API_BASE}?select=date_key,person_name&date_key=gte.2026-01-01&date_key=lte.2026-12-31&order=date_key.asc,person_name.asc`;
+  const res = await fetch(url, { headers: defaultHeaders });
+  if (!res.ok) throw new Error('Failed to load blocks');
+  const rows = await res.json();
+  blocksByDate = rowsToMap(rows);
+}
 
-  const payload = { blocksByDate, updatedAt: new Date().toISOString() };
-  const res = await fetch(BLOB_URL, {
-    method: 'PUT',
+async function addBlock(dateKey, personName) {
+  const url = `${API_BASE}?on_conflict=date_key,person_name`;
+  const res = await fetch(url, {
+    method: 'POST',
     headers: {
-      'Content-Type': 'application/json'
+      ...defaultHeaders,
+      Prefer: 'resolution=merge-duplicates,return=minimal'
     },
-    body: JSON.stringify(payload)
+    body: JSON.stringify([{ date_key: dateKey, person_name: personName }])
   });
+  if (!res.ok) throw new Error('Failed to add block');
+}
 
-  if (!res.ok) {
-    throw new Error('Cloud sync unavailable right now. Local save still worked.');
-  }
-
-  etag = res.headers.get('etag');
+async function removeBlock(dateKey, personName) {
+  const qs = new URLSearchParams({
+    date_key: `eq.${dateKey}`,
+    person_name: `eq.${personName}`
+  });
+  const res = await fetch(`${API_BASE}?${qs.toString()}`, {
+    method: 'DELETE',
+    headers: {
+      ...defaultHeaders,
+      Prefer: 'return=minimal'
+    }
+  });
+  if (!res.ok) throw new Error('Failed to remove block');
 }
 
 function render() {
@@ -137,7 +155,7 @@ function render() {
       dayEl.addEventListener('click', async () => {
         const myName = nameInput.value.trim();
         if (!myName) {
-          alert('Enter your name first.');
+          alert('Pick your name first.');
           nameInput.focus();
           return;
         }
@@ -145,20 +163,16 @@ function render() {
         const existing = blocksByDate[key] || [];
         const alreadyMine = existing.some((n) => n.toLowerCase() === myName.toLowerCase());
 
-        if (alreadyMine) {
-          blocksByDate[key] = existing.filter((n) => n.toLowerCase() !== myName.toLowerCase());
-          if (!blocksByDate[key].length) delete blocksByDate[key];
-        } else {
-          blocksByDate[key] = [...existing, myName]
-            .filter((n, i, arr) => arr.findIndex((x) => x.toLowerCase() === n.toLowerCase()) === i)
-            .sort((a, b) => a.localeCompare(b));
-        }
-
-        render();
         try {
-          await saveData();
-        } catch (err) {
-          console.warn(err.message);
+          if (alreadyMine) {
+            await removeBlock(key, myName);
+          } else {
+            await addBlock(key, myName);
+          }
+          await loadData();
+          render();
+        } catch {
+          alert('Could not sync right now, refresh and try again.');
         }
       });
 
@@ -196,7 +210,9 @@ passcodeInput.addEventListener('keydown', (e) => {
   }
   render();
   setInterval(async () => {
-    await loadData();
-    render();
-  }, 20000);
+    try {
+      await loadData();
+      render();
+    } catch {}
+  }, 8000);
 })();
