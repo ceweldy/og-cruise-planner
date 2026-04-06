@@ -8,6 +8,7 @@ const MONTH_NAMES = [
 const SUPABASE_URL = 'https://ldnzmpqnbbiiwtyunxpo.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxkbnptcHFuYmJpaXd0eXVueHBvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzMzQ0NjcsImV4cCI6MjA4NTkxMDQ2N30.TDZfXz0K7bu8pifms5kKddTy06HI6W0ZOHj_kUj-sPU';
 const API_BASE = `${SUPABASE_URL}/rest/v1/cruise_blocks`;
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const monthsEl = document.getElementById('months');
 const monthTemplate = document.getElementById('monthTemplate');
@@ -94,6 +95,22 @@ async function removeBlock(dateKey, personName) {
     }
   });
   if (!res.ok) throw new Error('Failed to remove block');
+}
+
+function setupRealtime() {
+  supabaseClient
+    .channel('cruise-blocks-live')
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'cruise_blocks'
+    }, async () => {
+      try {
+        await loadData();
+        render();
+      } catch {}
+    })
+    .subscribe();
 }
 
 function render() {
@@ -209,10 +226,13 @@ passcodeInput.addEventListener('keydown', (e) => {
     blocksByDate = {};
   }
   render();
+  setupRealtime();
+
+  // Fallback poll in case websocket drops on some networks.
   setInterval(async () => {
     try {
       await loadData();
       render();
     } catch {}
-  }, 8000);
+  }, 45000);
 })();
