@@ -19,6 +19,10 @@ body {
   background: linear-gradient(180deg, #eef3ff 0%, var(--bg) 180px);
 }
 
+body.locked #appMain {
+  visibility: hidden;
+}
+
 .wrap {
   max-width: 1320px;
   margin: 0 auto;

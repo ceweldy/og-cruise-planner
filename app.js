@@ -10,6 +10,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const API_BASE = `${SUPABASE_URL}/rest/v1/cruise_blocks`;
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+const appMain = document.getElementById('appMain');
 const monthsEl = document.getElementById('months');
 const monthTemplate = document.getElementById('monthTemplate');
 const nameInput = document.getElementById('nameInput');
@@ -203,6 +204,8 @@ function render() {
 function unlockIfValid() {
   if (passcodeInput.value.trim() === PASSCODE) {
     sessionStorage.setItem(PASSCODE_FLAG, '1');
+    document.body.classList.remove('locked');
+    appMain.style.visibility = 'visible';
     passcodeGate.classList.add('hidden');
     passcodeError.textContent = '';
     return true;
@@ -218,7 +221,11 @@ passcodeInput.addEventListener('keydown', (e) => {
 
 (async function init() {
   const unlocked = sessionStorage.getItem(PASSCODE_FLAG) === '1';
-  if (unlocked) passcodeGate.classList.add('hidden');
+  if (unlocked) {
+    document.body.classList.remove('locked');
+    appMain.style.visibility = 'visible';
+    passcodeGate.classList.add('hidden');
+  }
 
   try {
     await loadData();
