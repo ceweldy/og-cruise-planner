@@ -30,6 +30,16 @@
     <section id="months" class="months"></section>
   </main>
 
+  <div id="passcodeGate" class="gate">
+    <div class="gate-card">
+      <h2>Enter Passcode</h2>
+      <p>This planner is shared, enter the code to continue.</p>
+      <input id="passcodeInput" type="password" placeholder="Passcode" autofocus />
+      <button id="passcodeBtn">Unlock</button>
+      <div id="passcodeError" class="gate-error"></div>
+    </div>
+  </div>
+
   <template id="monthTemplate">
     <article class="month card">
       <h2 class="month-title"></h2>

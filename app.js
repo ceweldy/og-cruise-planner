@@ -9,6 +9,12 @@ const MONTH_NAMES = [
 const monthsEl = document.getElementById('months');
 const monthTemplate = document.getElementById('monthTemplate');
 const nameInput = document.getElementById('nameInput');
+const passcodeGate = document.getElementById('passcodeGate');
+const passcodeInput = document.getElementById('passcodeInput');
+const passcodeBtn = document.getElementById('passcodeBtn');
+const passcodeError = document.getElementById('passcodeError');
+const PASSCODE = 'theogs';
+const PASSCODE_FLAG = 'ogCruiseUnlocked';
 
 let blocksByDate = {};
 let etag = null;
@@ -144,7 +150,26 @@ function render() {
   }
 }
 
+function unlockIfValid() {
+  if (passcodeInput.value.trim() === PASSCODE) {
+    sessionStorage.setItem(PASSCODE_FLAG, '1');
+    passcodeGate.classList.add('hidden');
+    passcodeError.textContent = '';
+    return true;
+  }
+  passcodeError.textContent = 'Wrong passcode';
+  return false;
+}
+
+passcodeBtn.addEventListener('click', unlockIfValid);
+passcodeInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') unlockIfValid();
+});
+
 (async function init() {
+  const unlocked = sessionStorage.getItem(PASSCODE_FLAG) === '1';
+  if (unlocked) passcodeGate.classList.add('hidden');
+
   try {
     await loadData();
   } catch {

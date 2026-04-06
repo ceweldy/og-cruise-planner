@@ -166,6 +166,65 @@ h1 {
   background: #fff;
 }
 
+.gate {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: grid;
+  place-items: center;
+  z-index: 1000;
+}
+
+.gate.hidden { display: none; }
+
+.gate-card {
+  width: min(92vw, 360px);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
+}
+
+.gate-card h2 {
+  margin: 0 0 6px;
+  font-size: 1.15rem;
+}
+
+.gate-card p {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.gate-card input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  margin-bottom: 10px;
+}
+
+.gate-card button {
+  width: 100%;
+  border: 0;
+  background: var(--primary);
+  color: #fff;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.gate-error {
+  color: #b42318;
+  font-size: 0.85rem;
+  min-height: 1em;
+  margin-top: 8px;
+}
+
 @media (max-width: 760px) {
   .month { padding: 10px; }
   .day { min-height: 58px; }
