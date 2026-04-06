@@ -18,6 +18,7 @@ const PASSCODE_FLAG = 'ogCruiseUnlocked';
 
 let blocksByDate = {};
 let etag = null;
+const LOCAL_KEY = 'ogCruiseBlocksByDate';
 
 nameInput.value = localStorage.getItem('ogCruiseName') || '';
 nameInput.addEventListener('input', () => {
@@ -32,25 +33,35 @@ const toDateKey = (date) => {
 };
 
 async function loadData() {
-  const res = await fetch(BLOB_URL, { cache: 'no-store' });
-  etag = res.headers.get('etag');
-  const data = await res.json();
-  blocksByDate = data?.blocksByDate || {};
+  try {
+    const res = await fetch(BLOB_URL, { cache: 'no-store' });
+    etag = res.headers.get('etag');
+    const data = await res.json();
+    if (data?.blocksByDate && typeof data.blocksByDate === 'object') {
+      blocksByDate = data.blocksByDate;
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(blocksByDate));
+      return;
+    }
+  } catch {}
+
+  const local = localStorage.getItem(LOCAL_KEY);
+  blocksByDate = local ? JSON.parse(local) : {};
 }
 
 async function saveData() {
+  localStorage.setItem(LOCAL_KEY, JSON.stringify(blocksByDate));
+
   const payload = { blocksByDate, updatedAt: new Date().toISOString() };
   const res = await fetch(BLOB_URL, {
     method: 'PUT',
     headers: {
-      'Content-Type': 'application/json',
-      ...(etag ? { 'If-Match': etag } : {})
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify(payload)
   });
 
   if (!res.ok) {
-    throw new Error('Could not save. Someone may have edited at the same time.');
+    throw new Error('Cloud sync unavailable right now. Local save still worked.');
   }
 
   etag = res.headers.get('etag');
@@ -131,16 +142,12 @@ function render() {
             .sort((a, b) => a.localeCompare(b));
         }
 
+        render();
         try {
           await saveData();
         } catch (err) {
-          await loadData();
-          render();
-          alert(err.message);
-          return;
+          console.warn(err.message);
         }
-
-        render();
       });
 
       daysGrid.appendChild(dayEl);
