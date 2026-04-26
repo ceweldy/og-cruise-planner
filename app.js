@@ -18,14 +18,24 @@ const passcodeGate = document.getElementById('passcodeGate');
 const passcodeInput = document.getElementById('passcodeInput');
 const passcodeBtn = document.getElementById('passcodeBtn');
 const passcodeError = document.getElementById('passcodeError');
+const dayModal = document.getElementById('dayModal');
+const dayModalBackdrop = document.getElementById('dayModalBackdrop');
+const dayModalClose = document.getElementById('dayModalClose');
+const dayModalTitle = document.getElementById('dayModalTitle');
+const dayModalStatus = document.getElementById('dayModalStatus');
+const dayModalPeople = document.getElementById('dayModalPeople');
+const dayModalToggle = document.getElementById('dayModalToggle');
 const PASSCODE = 'theogs';
 const PASSCODE_FLAG = 'ogCruiseUnlocked';
 
 let blocksByDate = {};
+let activeDateKey = null;
 
 nameInput.value = localStorage.getItem('ogCruiseName') || '';
 nameInput.addEventListener('change', () => {
   localStorage.setItem('ogCruiseName', nameInput.value.trim());
+  if (activeDateKey) updateModalContent(activeDateKey);
+  render();
 });
 
 const CLASS_BY_NAME = {
@@ -51,6 +61,22 @@ const toDateKey = (date) => {
   const dd = String(date.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
 };
+
+const formatFullDate = (dateKey) => {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  return date.toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric'
+  });
+};
+
+const getSelectedName = () => nameInput.value.trim();
+const isMyBlock = (name, selectedName = getSelectedName()) => (
+  !!selectedName && name.toLowerCase() === selectedName.toLowerCase()
+);
 
 function rowsToMap(rows) {
   const out = {};
@@ -98,6 +124,35 @@ async function removeBlock(dateKey, personName) {
   if (!res.ok) throw new Error('Failed to remove block');
 }
 
+async function syncAndRender() {
+  await loadData();
+  render();
+  if (activeDateKey) updateModalContent(activeDateKey);
+}
+
+async function toggleBlock(dateKey) {
+  const myName = getSelectedName();
+  if (!myName) {
+    alert('Pick your name first.');
+    nameInput.focus();
+    return;
+  }
+
+  const existing = blocksByDate[dateKey] || [];
+  const alreadyMine = existing.some((name) => isMyBlock(name, myName));
+
+  try {
+    if (alreadyMine) {
+      await removeBlock(dateKey, myName);
+    } else {
+      await addBlock(dateKey, myName);
+    }
+    await syncAndRender();
+  } catch {
+    alert('Could not sync right now, refresh and try again.');
+  }
+}
+
 function setupRealtime() {
   supabaseClient
     .channel('cruise-blocks-live')
@@ -107,15 +162,74 @@ function setupRealtime() {
       table: 'cruise_blocks'
     }, async () => {
       try {
-        await loadData();
-        render();
+        await syncAndRender();
       } catch {}
     })
     .subscribe();
 }
 
+function createBlockPill(name) {
+  const pill = document.createElement('div');
+  const nameClass = CLASS_BY_NAME[name.toLowerCase()] || '';
+  pill.className = `block ${nameClass}`.trim();
+  pill.textContent = name;
+  return pill;
+}
+
+function openModal(dateKey) {
+  activeDateKey = dateKey;
+  updateModalContent(dateKey);
+  dayModal.classList.remove('hidden');
+  dayModal.setAttribute('aria-hidden', 'false');
+}
+
+function closeModal() {
+  activeDateKey = null;
+  dayModal.classList.add('hidden');
+  dayModal.setAttribute('aria-hidden', 'true');
+}
+
+function updateModalContent(dateKey) {
+  const blocks = blocksByDate[dateKey] || [];
+  const myName = getSelectedName();
+  const alreadyMine = blocks.some((name) => isMyBlock(name, myName));
+
+  dayModalTitle.textContent = formatFullDate(dateKey);
+
+  if (!myName) {
+    dayModalStatus.textContent = 'Pick your name to mark whether this date works for you.';
+    dayModalToggle.textContent = 'Pick your name first';
+    dayModalToggle.disabled = true;
+    dayModalToggle.classList.remove('secondary');
+  } else if (alreadyMine) {
+    dayModalStatus.textContent = `${myName} has blocked this date.`;
+    dayModalToggle.textContent = 'Remove my block';
+    dayModalToggle.disabled = false;
+    dayModalToggle.classList.add('secondary');
+  } else {
+    dayModalStatus.textContent = `${myName} has not blocked this date.`;
+    dayModalToggle.textContent = 'Block this date for me';
+    dayModalToggle.disabled = false;
+    dayModalToggle.classList.remove('secondary');
+  }
+
+  dayModalPeople.innerHTML = '';
+  if (!blocks.length) {
+    const empty = document.createElement('p');
+    empty.className = 'modal-empty';
+    empty.textContent = 'No one has blocked this date yet.';
+    dayModalPeople.appendChild(empty);
+    return;
+  }
+
+  blocks.forEach((name) => {
+    dayModalPeople.appendChild(createBlockPill(name));
+  });
+}
+
 function render() {
   monthsEl.innerHTML = '';
+  const selectedName = getSelectedName();
 
   for (let monthIndex = 0; monthIndex < 12; monthIndex++) {
     const node = monthTemplate.content.firstElementChild.cloneNode(true);
@@ -145,55 +259,53 @@ function render() {
       const date = new Date(YEAR, monthIndex, day);
       const key = toDateKey(date);
       const blocks = blocksByDate[key] || [];
+      const alreadyMine = blocks.some((name) => isMyBlock(name, selectedName));
 
       const dayEl = document.createElement('button');
       dayEl.className = 'day';
       if (blocks.length) dayEl.classList.add('has-blocks');
+      if (alreadyMine) dayEl.classList.add('mine');
+      dayEl.type = 'button';
+      dayEl.setAttribute('aria-label', `${formatFullDate(key)}. ${blocks.length ? `${blocks.length} blocked` : 'No blocks'}. Open details.`);
+
+      const summary = document.createElement('div');
+      summary.className = 'day-summary';
 
       const dayNum = document.createElement('div');
       dayNum.className = 'day-num';
       dayNum.textContent = day;
-      dayEl.appendChild(dayNum);
+      summary.appendChild(dayNum);
 
+      if (blocks.length) {
+        const count = document.createElement('div');
+        count.className = 'day-count';
+        count.textContent = blocks.length === 1 ? '1 block' : `${blocks.length} blocks`;
+        summary.appendChild(count);
+      }
+
+      dayEl.appendChild(summary);
+
+      const preview = document.createElement('div');
+      preview.className = 'day-preview';
       blocks.slice(0, 2).forEach((name) => {
-        const pill = document.createElement('div');
-        const nameClass = CLASS_BY_NAME[name.toLowerCase()] || '';
-        pill.className = `block ${nameClass}`.trim();
-        pill.textContent = name;
-        dayEl.appendChild(pill);
+        preview.appendChild(createBlockPill(name));
       });
 
       if (blocks.length > 2) {
         const extra = document.createElement('div');
         extra.className = 'block';
         extra.textContent = `+${blocks.length - 2} more`;
-        dayEl.appendChild(extra);
+        preview.appendChild(extra);
       }
 
-      dayEl.addEventListener('click', async () => {
-        const myName = nameInput.value.trim();
-        if (!myName) {
-          alert('Pick your name first.');
-          nameInput.focus();
-          return;
-        }
+      dayEl.appendChild(preview);
 
-        const existing = blocksByDate[key] || [];
-        const alreadyMine = existing.some((n) => n.toLowerCase() === myName.toLowerCase());
+      const hint = document.createElement('div');
+      hint.className = 'day-hint';
+      hint.textContent = blocks.length ? 'Tap for details' : 'Tap to review';
+      dayEl.appendChild(hint);
 
-        try {
-          if (alreadyMine) {
-            await removeBlock(key, myName);
-          } else {
-            await addBlock(key, myName);
-          }
-          await loadData();
-          render();
-        } catch {
-          alert('Could not sync right now, refresh and try again.');
-        }
-      });
-
+      dayEl.addEventListener('click', () => openModal(key));
       daysGrid.appendChild(dayEl);
     }
 
@@ -219,6 +331,18 @@ passcodeInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') unlockIfValid();
 });
 
+dayModalClose.addEventListener('click', closeModal);
+dayModalBackdrop.addEventListener('click', closeModal);
+dayModalToggle.addEventListener('click', async () => {
+  if (!activeDateKey || dayModalToggle.disabled) return;
+  await toggleBlock(activeDateKey);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !dayModal.classList.contains('hidden')) {
+    closeModal();
+  }
+});
+
 (async function init() {
   const unlocked = sessionStorage.getItem(PASSCODE_FLAG) === '1';
   if (unlocked) {
@@ -235,11 +359,9 @@ passcodeInput.addEventListener('keydown', (e) => {
   render();
   setupRealtime();
 
-  // Fallback poll in case websocket drops on some networks.
   setInterval(async () => {
     try {
-      await loadData();
-      render();
+      await syncAndRender();
     } catch {}
   }, 45000);
 })();

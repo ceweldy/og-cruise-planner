@@ -34,11 +34,26 @@
           <option>Julissa</option>
         </select>
       </label>
-      <p>Click any day to block it. Click your own block to remove it.</p>
+      <p>Click any day to see details and add or remove your block.</p>
     </section>
 
     <section id="months" class="months"></section>
   </main>
+
+  <div id="dayModal" class="modal hidden" aria-hidden="true">
+    <div id="dayModalBackdrop" class="modal-backdrop"></div>
+    <section class="modal-card card" role="dialog" aria-modal="true" aria-labelledby="dayModalTitle">
+      <button id="dayModalClose" class="modal-close" type="button" aria-label="Close date details">×</button>
+      <p class="modal-kicker">Date details</p>
+      <h2 id="dayModalTitle"></h2>
+      <p id="dayModalStatus" class="modal-status"></p>
+      <div>
+        <h3>Blocked by</h3>
+        <div id="dayModalPeople" class="modal-people"></div>
+      </div>
+      <button id="dayModalToggle" class="modal-toggle" type="button"></button>
+    </section>
+  </div>
 
   <div id="passcodeGate" class="gate">
     <div class="gate-card">
