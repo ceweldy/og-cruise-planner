@@ -9,12 +9,17 @@
   --primary: #0f6d8c;
   --primary-strong: #0c5670;
   --primary-soft: #e2f5fb;
+  --open: #eefbff;
+  --open-border: #8fd3ea;
+  --open-strong: #d7f3fb;
   --accent: #f6bf63;
   --accent-soft: #fff4df;
-  --blocked: #fff3e1;
-  --blocked-border: #e9b456;
-  --mine-bg: #dff4ff;
+  --blocked: #fff0dc;
+  --blocked-border: #de9d38;
+  --blocked-strong: #f7d7a1;
+  --mine-bg: #e1f5ff;
   --mine-border: #2d9cdb;
+  --mine-strong: #a8dcf7;
   --shadow: 0 20px 45px rgba(16, 55, 85, 0.12);
 }
 
@@ -144,8 +149,8 @@ button {
 }
 
 .legend-swatch--free {
-  background: rgba(255,255,255,0.85);
-  border-color: var(--line);
+  background: var(--open);
+  border-color: var(--open-border);
 }
 
 .controls {
@@ -240,12 +245,13 @@ button {
 
 .day {
   border: 1px solid rgba(215, 231, 239, 0.98);
-  background: rgba(255,255,255,0.9);
+  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(238, 251, 255, 0.92));
   padding: 7px;
   display: grid;
   gap: 6px;
   align-content: start;
-  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.28);
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
 }
 
 .day:hover {
@@ -265,13 +271,20 @@ button {
   outline-offset: 2px;
 }
 
-.day.has-blocks {
-  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255, 248, 235, 0.95));
+.day.is-open {
+  border-color: rgba(143, 211, 234, 0.95);
+  background: linear-gradient(180deg, rgba(255,255,255,0.99), rgba(238, 251, 255, 0.96));
 }
 
-.day.mine {
-  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(223, 244, 255, 0.95));
-  border-color: rgba(45, 156, 219, 0.45);
+.day.has-blocks {
+  border-color: rgba(222, 157, 56, 0.55);
+  background: linear-gradient(180deg, rgba(255,252,247,0.99), rgba(255, 241, 220, 0.97));
+}
+
+.day.is-mine {
+  border-color: rgba(45, 156, 219, 0.58);
+  background: linear-gradient(180deg, rgba(249, 254, 255, 0.99), rgba(225, 245, 255, 0.97));
+  box-shadow: inset 0 0 0 1px rgba(168, 220, 247, 0.42);
 }
 
 .day-head {
@@ -298,6 +311,21 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.day-count.count-open {
+  background: var(--open-strong);
+  color: #0d6079;
+}
+
+.day-count.count-blocked {
+  background: var(--blocked-strong);
+  color: #7c4d11;
+}
+
+.day-count.count-mine {
+  background: var(--mine-strong);
+  color: #0d5f83;
 }
 
 .day-list {
@@ -362,9 +390,14 @@ button {
 }
 
 .day-open-indicator {
+  width: fit-content;
   font-size: 0.68rem;
-  color: var(--muted);
-  padding-top: 1px;
+  font-weight: 700;
+  color: #0d6079;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(143, 211, 234, 0.95);
+  background: rgba(238, 251, 255, 0.98);
 }
 
 .day-actions {

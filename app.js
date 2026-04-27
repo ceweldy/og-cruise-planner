@@ -281,8 +281,12 @@ function renderDayCard(dayNumber, dateKey, blocks, selectedName) {
   dayEl.className = 'day';
 
   const alreadyMine = blocks.some((name) => isMyBlock(name, selectedName));
-  if (blocks.length) dayEl.classList.add('has-blocks');
-  if (alreadyMine) dayEl.classList.add('mine');
+  if (blocks.length) {
+    dayEl.classList.add('has-blocks');
+    dayEl.classList.add(alreadyMine ? 'is-mine' : 'is-blocked');
+  } else {
+    dayEl.classList.add('is-open');
+  }
 
   const head = document.createElement('div');
   head.className = 'day-head';
@@ -294,6 +298,7 @@ function renderDayCard(dayNumber, dateKey, blocks, selectedName) {
 
   const count = document.createElement('div');
   count.className = 'day-count';
+  count.classList.add(blocks.length ? (alreadyMine ? 'count-mine' : 'count-blocked') : 'count-open');
   count.textContent = blocks.length ? String(blocks.length) : '○';
   count.title = blocks.length ? `${blocks.length} blocked` : 'Open';
   count.setAttribute('aria-label', blocks.length ? `${blocks.length} blocked` : 'Open');
