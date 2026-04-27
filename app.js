@@ -14,8 +14,7 @@ const appMain = document.getElementById('appMain');
 const monthView = document.getElementById('monthView');
 const weekdaysEl = document.getElementById('weekdays');
 const monthLabel = document.getElementById('monthLabel');
-const prevMonthBtn = document.getElementById('prevMonthBtn');
-const nextMonthBtn = document.getElementById('nextMonthBtn');
+const monthSelect = document.getElementById('monthSelect');
 const selectionStatus = document.getElementById('selectionStatus');
 const nameInput = document.getElementById('nameInput');
 const dayInspector = document.getElementById('dayInspector');
@@ -175,6 +174,16 @@ function setupRealtime() {
     .subscribe();
 }
 
+function getInitials(name) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+}
+
 function createBlockPill(name, selectedName = getSelectedName()) {
   const pill = document.createElement('div');
   const nameClass = CLASS_BY_NAME[name.toLowerCase()] || '';
@@ -184,20 +193,40 @@ function createBlockPill(name, selectedName = getSelectedName()) {
   return pill;
 }
 
+function createBlockBadge(name, selectedName = getSelectedName()) {
+  const badge = document.createElement('div');
+  const nameClass = CLASS_BY_NAME[name.toLowerCase()] || '';
+  badge.className = `block-badge ${nameClass}`.trim();
+  if (isMyBlock(name, selectedName)) badge.classList.add('mine-badge');
+  badge.textContent = getInitials(name);
+  badge.title = name;
+  badge.setAttribute('aria-label', name);
+  return badge;
+}
+
 function updateSelectionStatus() {
   const selectedName = getSelectedName();
   if (selectedName) {
-    selectionStatus.textContent = `${selectedName}, tap “Block me” on any day to mark yourself unavailable.`;
+    selectionStatus.textContent = `${selectedName}, tap Block on any day to mark yourself unavailable.`;
   } else {
-    selectionStatus.textContent = 'Choose your name to start blocking dates inline.';
+    selectionStatus.textContent = 'Choose your name, then tap Block on any day.';
   }
+}
+
+function buildMonthSelect() {
+  monthSelect.innerHTML = '';
+  MONTH_NAMES.forEach((monthName, index) => {
+    const option = document.createElement('option');
+    option.value = String(index);
+    option.textContent = `${monthName} ${YEAR}`;
+    monthSelect.appendChild(option);
+  });
 }
 
 function setCurrentMonth(index) {
   currentMonthIndex = Math.max(0, Math.min(11, index));
   monthLabel.textContent = `${MONTH_NAMES[currentMonthIndex]} ${YEAR}`;
-  prevMonthBtn.disabled = currentMonthIndex === 0;
-  nextMonthBtn.disabled = currentMonthIndex === 11;
+  monthSelect.value = String(currentMonthIndex);
   render();
 }
 
@@ -265,40 +294,30 @@ function renderDayCard(dayNumber, dateKey, blocks, selectedName) {
 
   const count = document.createElement('div');
   count.className = 'day-count';
-  count.textContent = blocks.length ? `${blocks.length} blocked` : 'Open';
+  count.textContent = blocks.length ? String(blocks.length) : '○';
+  count.title = blocks.length ? `${blocks.length} blocked` : 'Open';
+  count.setAttribute('aria-label', blocks.length ? `${blocks.length} blocked` : 'Open');
   head.appendChild(count);
   dayEl.appendChild(head);
 
   const list = document.createElement('div');
   list.className = 'day-list';
   if (blocks.length) {
-    blocks.slice(0, 2).forEach((name) => list.appendChild(createBlockPill(name, selectedName)));
-    if (blocks.length > 2) {
+    blocks.slice(0, 4).forEach((name) => list.appendChild(createBlockBadge(name, selectedName)));
+    if (blocks.length > 4) {
       const extra = document.createElement('div');
-      extra.className = 'block-more';
-      extra.textContent = `+${blocks.length - 2} more`;
+      extra.className = 'block-badge block-more';
+      extra.textContent = `+${blocks.length - 4}`;
+      extra.title = `${blocks.length - 4} more blocked`;
       list.appendChild(extra);
     }
   } else {
-    const copy = document.createElement('p');
-    copy.className = 'day-copy empty-copy';
-    copy.textContent = 'Clear so far.';
-    list.appendChild(copy);
+    const open = document.createElement('div');
+    open.className = 'day-open-indicator';
+    open.textContent = 'Open';
+    list.appendChild(open);
   }
   dayEl.appendChild(list);
-
-  const dayCopy = document.createElement('p');
-  dayCopy.className = 'day-copy';
-  if (!selectedName) {
-    dayCopy.textContent = 'Pick your name to block this date.';
-  } else if (alreadyMine) {
-    dayCopy.textContent = 'You already blocked this date.';
-  } else if (blocks.length) {
-    dayCopy.textContent = 'Others have conflicts here.';
-  } else {
-    dayCopy.textContent = 'Looks open for everyone.';
-  }
-  dayEl.appendChild(dayCopy);
 
   const actions = document.createElement('div');
   actions.className = 'day-actions';
@@ -306,7 +325,7 @@ function renderDayCard(dayNumber, dateKey, blocks, selectedName) {
   const toggleBtn = document.createElement('button');
   toggleBtn.type = 'button';
   toggleBtn.className = `day-action ${alreadyMine ? 'secondary' : 'primary'}`;
-  toggleBtn.textContent = selectedName ? (alreadyMine ? 'Unblock me' : 'Block me') : 'Choose your name';
+  toggleBtn.textContent = selectedName ? (alreadyMine ? 'Unblock' : 'Block') : 'Name';
   toggleBtn.disabled = !selectedName;
   toggleBtn.setAttribute('aria-label', `${alreadyMine ? 'Unblock' : 'Block'} ${formatFullDate(dateKey)} for ${selectedName || 'selected user'}`);
   toggleBtn.addEventListener('click', () => toggleBlock(dateKey, toggleBtn));
@@ -315,7 +334,7 @@ function renderDayCard(dayNumber, dateKey, blocks, selectedName) {
   const detailsBtn = document.createElement('button');
   detailsBtn.type = 'button';
   detailsBtn.className = 'day-action ghost';
-  detailsBtn.textContent = blocks.length ? 'Who’s blocked?' : 'View day';
+  detailsBtn.textContent = 'View';
   detailsBtn.addEventListener('click', () => updateInspector(dateKey, { scroll: true }));
   actions.appendChild(detailsBtn);
 
@@ -363,13 +382,14 @@ passcodeInput.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') unlockIfValid();
 });
 
-prevMonthBtn.addEventListener('click', () => setCurrentMonth(currentMonthIndex - 1));
-nextMonthBtn.addEventListener('click', () => setCurrentMonth(currentMonthIndex + 1));
+monthSelect.addEventListener('change', (event) => {
+  setCurrentMonth(Number(event.target.value));
+});
 
 document.addEventListener('keydown', (event) => {
   if (document.body.classList.contains('locked')) return;
-  if (event.key === 'ArrowLeft' && !prevMonthBtn.disabled) setCurrentMonth(currentMonthIndex - 1);
-  if (event.key === 'ArrowRight' && !nextMonthBtn.disabled) setCurrentMonth(currentMonthIndex + 1);
+  if (event.key === 'ArrowLeft' && currentMonthIndex > 0) setCurrentMonth(currentMonthIndex - 1);
+  if (event.key === 'ArrowRight' && currentMonthIndex < 11) setCurrentMonth(currentMonthIndex + 1);
 });
 
 (async function init() {
@@ -381,6 +401,7 @@ document.addEventListener('keydown', (event) => {
   }
 
   buildWeekdays();
+  buildMonthSelect();
   updateSelectionStatus();
 
   try {
