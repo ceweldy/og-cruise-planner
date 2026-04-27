@@ -6,22 +6,27 @@
   <title>OG Cruise Planner</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body class="locked">
   <main id="appMain" class="wrap">
-    <header class="top">
-      <h1>OG Cruise Planner</h1>
-      <div class="legend">
-        <span class="dot"></span>
-        <span>Blocked date</span>
+    <section class="hero card">
+      <div class="hero-copy">
+        <p class="eyebrow">OG Cruise Planner</p>
+        <h1>Pick your month, tap your dates, and keep the group in sync.</h1>
+        <p class="hero-text">Use the month view to quickly block or unblock dates for yourself. Open day details only when you want to see the full crew list.</p>
       </div>
-    </header>
+      <div class="legend-panel">
+        <div class="legend-item"><span class="legend-swatch legend-swatch--mine"></span><span>Your block</span></div>
+        <div class="legend-item"><span class="legend-swatch legend-swatch--busy"></span><span>Someone blocked</span></div>
+        <div class="legend-item"><span class="legend-swatch legend-swatch--free"></span><span>No blocks yet</span></div>
+      </div>
+    </section>
 
     <section class="card controls">
-      <label>
-        Pick your name
+      <label class="field">
+        <span>Who are you?</span>
         <select id="nameInput">
           <option value="">Select name...</option>
           <option>Connor</option>
@@ -34,26 +39,30 @@
           <option>Julissa</option>
         </select>
       </label>
-      <p>Click any day to see details and add or remove your block.</p>
+      <p id="selectionStatus" class="selection-status">Choose your name to start blocking dates inline.</p>
     </section>
 
-    <section id="months" class="months"></section>
-  </main>
-
-  <div id="dayModal" class="modal hidden" aria-hidden="true">
-    <div id="dayModalBackdrop" class="modal-backdrop"></div>
-    <section class="modal-card card" role="dialog" aria-modal="true" aria-labelledby="dayModalTitle">
-      <button id="dayModalClose" class="modal-close" type="button" aria-label="Close date details">×</button>
-      <p class="modal-kicker">Date details</p>
-      <h2 id="dayModalTitle"></h2>
-      <p id="dayModalStatus" class="modal-status"></p>
-      <div>
-        <h3>Blocked by</h3>
-        <div id="dayModalPeople" class="modal-people"></div>
+    <section class="calendar-shell card">
+      <div class="calendar-toolbar">
+        <button id="prevMonthBtn" class="nav-btn" type="button" aria-label="Previous month">← <span>Prev</span></button>
+        <div class="toolbar-title">
+          <p class="toolbar-kicker">2026 sailing window</p>
+          <h2 id="monthLabel"></h2>
+        </div>
+        <button id="nextMonthBtn" class="nav-btn" type="button" aria-label="Next month"><span>Next</span> →</button>
       </div>
-      <button id="dayModalToggle" class="modal-toggle" type="button"></button>
+
+      <div class="weekdays" id="weekdays"></div>
+      <section id="monthView" class="days" aria-live="polite"></section>
     </section>
-  </div>
+
+    <section id="dayInspector" class="card inspector empty-state">
+      <p class="inspector-kicker">Day details</p>
+      <h3 id="inspectorTitle">Pick a date</h3>
+      <p id="inspectorStatus" class="inspector-status">Tap “Who’s blocked?” on any day to see the full list.</p>
+      <div id="inspectorPeople" class="inspector-people"></div>
+    </section>
+  </main>
 
   <div id="passcodeGate" class="gate">
     <div class="gate-card">
@@ -64,14 +73,6 @@
       <div id="passcodeError" class="gate-error"></div>
     </div>
   </div>
-
-  <template id="monthTemplate">
-    <article class="month card">
-      <h2 class="month-title"></h2>
-      <div class="weekdays"></div>
-      <div class="days"></div>
-    </article>
-  </template>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="app.js"></script>

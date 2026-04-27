@@ -11,33 +11,24 @@ const API_BASE = `${SUPABASE_URL}/rest/v1/cruise_blocks`;
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const appMain = document.getElementById('appMain');
-const monthsEl = document.getElementById('months');
-const monthTemplate = document.getElementById('monthTemplate');
+const monthView = document.getElementById('monthView');
+const weekdaysEl = document.getElementById('weekdays');
+const monthLabel = document.getElementById('monthLabel');
+const prevMonthBtn = document.getElementById('prevMonthBtn');
+const nextMonthBtn = document.getElementById('nextMonthBtn');
+const selectionStatus = document.getElementById('selectionStatus');
 const nameInput = document.getElementById('nameInput');
+const dayInspector = document.getElementById('dayInspector');
+const inspectorTitle = document.getElementById('inspectorTitle');
+const inspectorStatus = document.getElementById('inspectorStatus');
+const inspectorPeople = document.getElementById('inspectorPeople');
 const passcodeGate = document.getElementById('passcodeGate');
 const passcodeInput = document.getElementById('passcodeInput');
 const passcodeBtn = document.getElementById('passcodeBtn');
 const passcodeError = document.getElementById('passcodeError');
-const dayModal = document.getElementById('dayModal');
-const dayModalBackdrop = document.getElementById('dayModalBackdrop');
-const dayModalClose = document.getElementById('dayModalClose');
-const dayModalTitle = document.getElementById('dayModalTitle');
-const dayModalStatus = document.getElementById('dayModalStatus');
-const dayModalPeople = document.getElementById('dayModalPeople');
-const dayModalToggle = document.getElementById('dayModalToggle');
+
 const PASSCODE = 'theogs';
 const PASSCODE_FLAG = 'ogCruiseUnlocked';
-
-let blocksByDate = {};
-let activeDateKey = null;
-
-nameInput.value = localStorage.getItem('ogCruiseName') || '';
-nameInput.addEventListener('change', () => {
-  localStorage.setItem('ogCruiseName', nameInput.value.trim());
-  if (activeDateKey) updateModalContent(activeDateKey);
-  render();
-});
-
 const CLASS_BY_NAME = {
   connor: 'connor',
   alexa: 'alexa',
@@ -54,6 +45,18 @@ const defaultHeaders = {
   Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
   'Content-Type': 'application/json'
 };
+
+let blocksByDate = {};
+let currentMonthIndex = 0;
+let activeDateKey = null;
+
+nameInput.value = localStorage.getItem('ogCruiseName') || '';
+nameInput.addEventListener('change', () => {
+  localStorage.setItem('ogCruiseName', nameInput.value.trim());
+  updateSelectionStatus();
+  if (activeDateKey) updateInspector(activeDateKey);
+  render();
+});
 
 const toDateKey = (date) => {
   const yyyy = date.getFullYear();
@@ -74,9 +77,7 @@ const formatFullDate = (dateKey) => {
 };
 
 const getSelectedName = () => nameInput.value.trim();
-const isMyBlock = (name, selectedName = getSelectedName()) => (
-  !!selectedName && name.toLowerCase() === selectedName.toLowerCase()
-);
+const isMyBlock = (name, selectedName = getSelectedName()) => !!selectedName && name.toLowerCase() === selectedName.toLowerCase();
 
 function rowsToMap(rows) {
   const out = {};
@@ -84,7 +85,7 @@ function rowsToMap(rows) {
     if (!out[row.date_key]) out[row.date_key] = [];
     out[row.date_key].push(row.person_name);
   }
-  Object.keys(out).forEach((k) => out[k].sort((a, b) => a.localeCompare(b)));
+  Object.keys(out).forEach((key) => out[key].sort((a, b) => a.localeCompare(b)));
   return out;
 }
 
@@ -127,10 +128,10 @@ async function removeBlock(dateKey, personName) {
 async function syncAndRender() {
   await loadData();
   render();
-  if (activeDateKey) updateModalContent(activeDateKey);
+  if (activeDateKey) updateInspector(activeDateKey);
 }
 
-async function toggleBlock(dateKey) {
+async function toggleBlock(dateKey, toggleButton) {
   const myName = getSelectedName();
   if (!myName) {
     alert('Pick your name first.');
@@ -141,6 +142,8 @@ async function toggleBlock(dateKey) {
   const existing = blocksByDate[dateKey] || [];
   const alreadyMine = existing.some((name) => isMyBlock(name, myName));
 
+  if (toggleButton) toggleButton.disabled = true;
+
   try {
     if (alreadyMine) {
       await removeBlock(dateKey, myName);
@@ -148,8 +151,12 @@ async function toggleBlock(dateKey) {
       await addBlock(dateKey, myName);
     }
     await syncAndRender();
+    activeDateKey = dateKey;
+    updateInspector(dateKey);
   } catch {
     alert('Could not sync right now, refresh and try again.');
+  } finally {
+    if (toggleButton) toggleButton.disabled = false;
   }
 }
 
@@ -168,148 +175,173 @@ function setupRealtime() {
     .subscribe();
 }
 
-function createBlockPill(name) {
+function createBlockPill(name, selectedName = getSelectedName()) {
   const pill = document.createElement('div');
   const nameClass = CLASS_BY_NAME[name.toLowerCase()] || '';
   pill.className = `block ${nameClass}`.trim();
+  if (isMyBlock(name, selectedName)) pill.classList.add('mine-pill');
   pill.textContent = name;
   return pill;
 }
 
-function openModal(dateKey) {
-  activeDateKey = dateKey;
-  updateModalContent(dateKey);
-  dayModal.classList.remove('hidden');
-  dayModal.setAttribute('aria-hidden', 'false');
-}
-
-function closeModal() {
-  activeDateKey = null;
-  dayModal.classList.add('hidden');
-  dayModal.setAttribute('aria-hidden', 'true');
-}
-
-function updateModalContent(dateKey) {
-  const blocks = blocksByDate[dateKey] || [];
-  const myName = getSelectedName();
-  const alreadyMine = blocks.some((name) => isMyBlock(name, myName));
-
-  dayModalTitle.textContent = formatFullDate(dateKey);
-
-  if (!myName) {
-    dayModalStatus.textContent = 'Pick your name to mark whether this date works for you.';
-    dayModalToggle.textContent = 'Pick your name first';
-    dayModalToggle.disabled = true;
-    dayModalToggle.classList.remove('secondary');
-  } else if (alreadyMine) {
-    dayModalStatus.textContent = `${myName} has blocked this date.`;
-    dayModalToggle.textContent = 'Remove my block';
-    dayModalToggle.disabled = false;
-    dayModalToggle.classList.add('secondary');
+function updateSelectionStatus() {
+  const selectedName = getSelectedName();
+  if (selectedName) {
+    selectionStatus.textContent = `${selectedName}, tap “Block me” on any day to mark yourself unavailable.`;
   } else {
-    dayModalStatus.textContent = `${myName} has not blocked this date.`;
-    dayModalToggle.textContent = 'Block this date for me';
-    dayModalToggle.disabled = false;
-    dayModalToggle.classList.remove('secondary');
+    selectionStatus.textContent = 'Choose your name to start blocking dates inline.';
   }
+}
 
-  dayModalPeople.innerHTML = '';
+function setCurrentMonth(index) {
+  currentMonthIndex = Math.max(0, Math.min(11, index));
+  monthLabel.textContent = `${MONTH_NAMES[currentMonthIndex]} ${YEAR}`;
+  prevMonthBtn.disabled = currentMonthIndex === 0;
+  nextMonthBtn.disabled = currentMonthIndex === 11;
+  render();
+}
+
+function updateInspector(dateKey, options = {}) {
+  activeDateKey = dateKey;
+  const selectedName = getSelectedName();
+  const blocks = blocksByDate[dateKey] || [];
+  const alreadyMine = blocks.some((name) => isMyBlock(name, selectedName));
+
+  dayInspector.classList.remove('empty-state');
+  inspectorTitle.textContent = formatFullDate(dateKey);
+
   if (!blocks.length) {
-    const empty = document.createElement('p');
-    empty.className = 'modal-empty';
-    empty.textContent = 'No one has blocked this date yet.';
-    dayModalPeople.appendChild(empty);
+    inspectorStatus.textContent = selectedName
+      ? `${selectedName} can tap “Block me” on the calendar if this date does not work.`
+      : 'No one has blocked this date yet.';
+    inspectorPeople.innerHTML = '';
+    if (options.scroll) {
+      dayInspector.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
     return;
   }
 
-  blocks.forEach((name) => {
-    dayModalPeople.appendChild(createBlockPill(name));
+  if (!selectedName) {
+    inspectorStatus.textContent = `${blocks.length === 1 ? '1 person has' : `${blocks.length} people have`} blocked this date.`;
+  } else if (alreadyMine) {
+    inspectorStatus.textContent = `You’re on the blocked list for this date, along with ${Math.max(blocks.length - 1, 0)} other ${blocks.length - 1 === 1 ? 'person' : 'people'}.`;
+  } else {
+    inspectorStatus.textContent = `${blocks.length === 1 ? '1 person is' : `${blocks.length} people are`} currently blocked.`;
+  }
+
+  inspectorPeople.innerHTML = '';
+  blocks.forEach((name) => inspectorPeople.appendChild(createBlockPill(name, selectedName)));
+
+  if (options.scroll) {
+    dayInspector.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+function buildWeekdays() {
+  weekdaysEl.innerHTML = '';
+  WEEKDAYS.forEach((dayName) => {
+    const el = document.createElement('div');
+    el.className = 'weekday';
+    el.textContent = dayName;
+    weekdaysEl.appendChild(el);
   });
 }
 
+function renderDayCard(dayNumber, dateKey, blocks, selectedName) {
+  const dayEl = document.createElement('article');
+  dayEl.className = 'day';
+
+  const alreadyMine = blocks.some((name) => isMyBlock(name, selectedName));
+  if (blocks.length) dayEl.classList.add('has-blocks');
+  if (alreadyMine) dayEl.classList.add('mine');
+
+  const head = document.createElement('div');
+  head.className = 'day-head';
+
+  const dayNum = document.createElement('div');
+  dayNum.className = 'day-num';
+  dayNum.textContent = dayNumber;
+  head.appendChild(dayNum);
+
+  const count = document.createElement('div');
+  count.className = 'day-count';
+  count.textContent = blocks.length ? `${blocks.length} blocked` : 'Open';
+  head.appendChild(count);
+  dayEl.appendChild(head);
+
+  const list = document.createElement('div');
+  list.className = 'day-list';
+  if (blocks.length) {
+    blocks.slice(0, 2).forEach((name) => list.appendChild(createBlockPill(name, selectedName)));
+    if (blocks.length > 2) {
+      const extra = document.createElement('div');
+      extra.className = 'block-more';
+      extra.textContent = `+${blocks.length - 2} more`;
+      list.appendChild(extra);
+    }
+  } else {
+    const copy = document.createElement('p');
+    copy.className = 'day-copy empty-copy';
+    copy.textContent = 'Clear so far.';
+    list.appendChild(copy);
+  }
+  dayEl.appendChild(list);
+
+  const dayCopy = document.createElement('p');
+  dayCopy.className = 'day-copy';
+  if (!selectedName) {
+    dayCopy.textContent = 'Pick your name to block this date.';
+  } else if (alreadyMine) {
+    dayCopy.textContent = 'You already blocked this date.';
+  } else if (blocks.length) {
+    dayCopy.textContent = 'Others have conflicts here.';
+  } else {
+    dayCopy.textContent = 'Looks open for everyone.';
+  }
+  dayEl.appendChild(dayCopy);
+
+  const actions = document.createElement('div');
+  actions.className = 'day-actions';
+
+  const toggleBtn = document.createElement('button');
+  toggleBtn.type = 'button';
+  toggleBtn.className = `day-action ${alreadyMine ? 'secondary' : 'primary'}`;
+  toggleBtn.textContent = selectedName ? (alreadyMine ? 'Unblock me' : 'Block me') : 'Choose your name';
+  toggleBtn.disabled = !selectedName;
+  toggleBtn.setAttribute('aria-label', `${alreadyMine ? 'Unblock' : 'Block'} ${formatFullDate(dateKey)} for ${selectedName || 'selected user'}`);
+  toggleBtn.addEventListener('click', () => toggleBlock(dateKey, toggleBtn));
+  actions.appendChild(toggleBtn);
+
+  const detailsBtn = document.createElement('button');
+  detailsBtn.type = 'button';
+  detailsBtn.className = 'day-action ghost';
+  detailsBtn.textContent = blocks.length ? 'Who’s blocked?' : 'View day';
+  detailsBtn.addEventListener('click', () => updateInspector(dateKey, { scroll: true }));
+  actions.appendChild(detailsBtn);
+
+  dayEl.appendChild(actions);
+  return dayEl;
+}
+
 function render() {
-  monthsEl.innerHTML = '';
+  monthView.innerHTML = '';
   const selectedName = getSelectedName();
+  const firstDay = new Date(YEAR, currentMonthIndex, 1);
+  const startWeekday = firstDay.getDay();
+  const daysInMonth = new Date(YEAR, currentMonthIndex + 1, 0).getDate();
 
-  for (let monthIndex = 0; monthIndex < 12; monthIndex++) {
-    const node = monthTemplate.content.firstElementChild.cloneNode(true);
-    node.querySelector('.month-title').textContent = `${MONTH_NAMES[monthIndex]} ${YEAR}`;
+  for (let i = 0; i < startWeekday; i++) {
+    const placeholder = document.createElement('div');
+    placeholder.className = 'day-placeholder';
+    placeholder.setAttribute('aria-hidden', 'true');
+    monthView.appendChild(placeholder);
+  }
 
-    const weekdayRow = node.querySelector('.weekdays');
-    WEEKDAYS.forEach((d) => {
-      const w = document.createElement('div');
-      w.className = 'weekday';
-      w.textContent = d;
-      weekdayRow.appendChild(w);
-    });
-
-    const daysGrid = node.querySelector('.days');
-    const firstDay = new Date(YEAR, monthIndex, 1);
-    const startWeekday = firstDay.getDay();
-    const daysInMonth = new Date(YEAR, monthIndex + 1, 0).getDate();
-
-    for (let i = 0; i < startWeekday; i++) {
-      const empty = document.createElement('button');
-      empty.className = 'day empty';
-      empty.disabled = true;
-      daysGrid.appendChild(empty);
-    }
-
-    for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(YEAR, monthIndex, day);
-      const key = toDateKey(date);
-      const blocks = blocksByDate[key] || [];
-      const alreadyMine = blocks.some((name) => isMyBlock(name, selectedName));
-
-      const dayEl = document.createElement('button');
-      dayEl.className = 'day';
-      if (blocks.length) dayEl.classList.add('has-blocks');
-      if (alreadyMine) dayEl.classList.add('mine');
-      dayEl.type = 'button';
-      dayEl.setAttribute('aria-label', `${formatFullDate(key)}. ${blocks.length ? `${blocks.length} blocked` : 'No blocks'}. Open details.`);
-
-      const summary = document.createElement('div');
-      summary.className = 'day-summary';
-
-      const dayNum = document.createElement('div');
-      dayNum.className = 'day-num';
-      dayNum.textContent = day;
-      summary.appendChild(dayNum);
-
-      if (blocks.length) {
-        const count = document.createElement('div');
-        count.className = 'day-count';
-        count.textContent = blocks.length === 1 ? '1 block' : `${blocks.length} blocks`;
-        summary.appendChild(count);
-      }
-
-      dayEl.appendChild(summary);
-
-      const preview = document.createElement('div');
-      preview.className = 'day-preview';
-      blocks.slice(0, 2).forEach((name) => {
-        preview.appendChild(createBlockPill(name));
-      });
-
-      if (blocks.length > 2) {
-        const extra = document.createElement('div');
-        extra.className = 'block';
-        extra.textContent = `+${blocks.length - 2} more`;
-        preview.appendChild(extra);
-      }
-
-      dayEl.appendChild(preview);
-
-      const hint = document.createElement('div');
-      hint.className = 'day-hint';
-      hint.textContent = blocks.length ? 'Tap for details' : 'Tap to review';
-      dayEl.appendChild(hint);
-
-      dayEl.addEventListener('click', () => openModal(key));
-      daysGrid.appendChild(dayEl);
-    }
-
-    monthsEl.appendChild(node);
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(YEAR, currentMonthIndex, day);
+    const dateKey = toDateKey(date);
+    const blocks = blocksByDate[dateKey] || [];
+    monthView.appendChild(renderDayCard(day, dateKey, blocks, selectedName));
   }
 }
 
@@ -327,20 +359,17 @@ function unlockIfValid() {
 }
 
 passcodeBtn.addEventListener('click', unlockIfValid);
-passcodeInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') unlockIfValid();
+passcodeInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') unlockIfValid();
 });
 
-dayModalClose.addEventListener('click', closeModal);
-dayModalBackdrop.addEventListener('click', closeModal);
-dayModalToggle.addEventListener('click', async () => {
-  if (!activeDateKey || dayModalToggle.disabled) return;
-  await toggleBlock(activeDateKey);
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !dayModal.classList.contains('hidden')) {
-    closeModal();
-  }
+prevMonthBtn.addEventListener('click', () => setCurrentMonth(currentMonthIndex - 1));
+nextMonthBtn.addEventListener('click', () => setCurrentMonth(currentMonthIndex + 1));
+
+document.addEventListener('keydown', (event) => {
+  if (document.body.classList.contains('locked')) return;
+  if (event.key === 'ArrowLeft' && !prevMonthBtn.disabled) setCurrentMonth(currentMonthIndex - 1);
+  if (event.key === 'ArrowRight' && !nextMonthBtn.disabled) setCurrentMonth(currentMonthIndex + 1);
 });
 
 (async function init() {
@@ -351,12 +380,16 @@ document.addEventListener('keydown', (e) => {
     passcodeGate.classList.add('hidden');
   }
 
+  buildWeekdays();
+  updateSelectionStatus();
+
   try {
     await loadData();
   } catch {
     blocksByDate = {};
   }
-  render();
+
+  setCurrentMonth(0);
   setupRealtime();
 
   setInterval(async () => {
